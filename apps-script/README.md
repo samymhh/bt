@@ -82,6 +82,26 @@ qualquer alteração feita em Configurações fica sem data — deixa de existir
 o futuro" até a coluna ser adicionada. Adicionar/editar jogadores, desportos e tipos de jornada não
 precisa desta coluna (não são versionados).
 
+## Backup automático diário
+
+[`Backup.gs`](Backup.gs) cria, todos os dias, uma cópia completa da Sheet dentro de uma
+subpasta **"Backups Bet Tracker"**, criada automaticamente na mesma pasta do Drive onde já está
+a Sheet (a pasta partilhada com o grupo) — por isso os teus colegas também têm acesso aos
+backups, tal como já têm à Sheet original. Guarda sempre os últimos 14 dias; os mais antigos vão
+para o lixo do Drive (recuperáveis durante 30 dias, não é definitivo).
+
+**Setup — só precisas de fazer isto uma vez:**
+
+1. Copia o conteúdo de [`Backup.gs`](Backup.gs) para um ficheiro novo chamado `Backup` no editor
+   do Apps Script (mesmo processo do passo 4 em "Como colocar isto na tua Google Sheet", acima).
+2. No menu de funções do editor, seleciona `configurarBackupDiario_` e clica em "Executar".
+3. Vai pedir uma autorização extra (acesso ao Drive, para conseguir copiar o ficheiro) — é
+   normal, aceita. Isto cria o trigger diário (corre às 3h da manhã) e faz logo um backup de
+   teste, para confirmares que a pasta "Backups Bet Tracker" aparece na Sheet.
+
+Não precisas de repetir isto depois de atualizar `Code.gs`/`Calculo.gs` — o trigger continua a
+chamar `criarBackupSheet_` normalmente, mesmo com código novo.
+
 ## Cache do dashboard (`?action=dashboard`)
 
 O payload completo (todas as épocas + histórico + config) fica em cache partilhada
