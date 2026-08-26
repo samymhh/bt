@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎯 Bet Tracker</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>🎯 BET TRACKER</h1>
+  <nav class="tabs">
+    <button type="button" class="tab-btn active" id="tab-dashboard" data-tab="dashboard">📊 Dashboard</button>
+    <button type="button" class="tab-btn" id="tab-historico" data-tab="historico">📜 Histórico</button>
+    <button type="button" class="tab-btn" id="tab-registar" data-tab="registar">➕ Registar</button>
+    <button type="button" class="tab-btn" id="tab-config" data-tab="config">⚙️ Configurações</button>
+  </nav>
+  <div class="topbar-controls">
+    <div class="utilizador-selector">
+      <label for="utilizador-select">👤 És:</label>
+      <select id="utilizador-select"><option value="">— escolhe —</option></select>
+    </div>
+    <div class="epoca-selector">
+      <label for="epoca-select">🗓️ Época:</label>
+      <select id="epoca-select"><option value="Todas">Todas</option></select>
+    </div>
+    <a id="link-exportar" class="btn-exportar" href="#" target="_blank" rel="noopener">📥 Exportar Excel</a>
+    <button type="button" id="theme-toggle" class="btn-tema" title="Alternar tema">🌓</button>
+  </div>
+</header>
+
+<main>
+  <div id="vista-dashboard">
+    <div id="estado" class="estado-msg">A carregar dados...</div>
+
+    <section id="secao-kpis" hidden>
+      <h2>📊 KPIs Principais</h2>
+      <div id="kpi-grid"></div>
+    </section>
+
+    <section id="secao-banca" hidden>
+      <h2>📈 Evolução da Banca</h2>
+      <div class="chart-card">
+        <canvas id="chart-banca" role="img" aria-label="Gráfico de evolução da banca ao longo dos boletins"></canvas>
+      </div>
+    </section>
+
+    <section id="secao-classificacao" hidden>
+      <h2>⭐ Classificação</h2>
+      <p class="secao-nota">Destaques de sempre — não muda com o filtro de época acima.</p>
+      <div class="classificacao-grid" id="classificacao-grid"></div>
+    </section>
+
+    <section id="secao-individual" hidden>
+      <h2>👥 Performance Individual</h2>
+      <p class="secao-nota">Todas as épocas.</p>
+      <div class="table-scroll">
+        <table id="tabela-individual">
+          <thead><tr>
+            <th>Jogador</th><th>Apostas</th><th>Acertos</th><th>Taxa</th>
+            <th>Odd Mediana</th><th>Odd Mediana Acerto</th><th>Odd Mediana Erro</th>
+            <th>Maior Odd Acertada</th><th>Seq. Máx. Vit.</th><th>Seq. Máx. Der.</th><th>Seq. Atual</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="secao-multas" hidden>
+      <h2>🧾 Multas</h2>
+      <p class="secao-nota">Todas as épocas.</p>
+      <div class="two-col">
+        <div class="chart-card">
+          <canvas id="chart-multas-tipo" role="img" aria-label="Gráfico de pizza das multas por tipo"></canvas>
+        </div>
+        <div class="table-scroll">
+          <table id="tabela-multas-jogador">
+            <caption>🧾 Multas por Jogador</caption>
+            <thead><tr>
+              <th>Jogador</th><th>Nº Atrasos</th><th>Multa Atraso</th><th>Nº Erros</th>
+              <th>Multa Erro</th><th>Nº Faltas</th><th>Multa Falta</th><th>Total</th><th>Pendentes</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="secao-desporto" hidden>
+      <h2>🏀 Performance por Desporto</h2>
+      <p class="secao-nota">Todas as épocas.</p>
+      <div class="two-col">
+        <div class="table-scroll">
+          <table id="tabela-desporto-global">
+            <thead><tr><th>Desporto</th><th>Apostas</th><th>Acertos</th><th>Taxa</th><th>Odd Média</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="table-scroll">
+          <table id="tabela-desporto-individual">
+            <caption>🏅 Taxa de acerto por jogador e desporto</caption>
+            <thead><tr id="desporto-individual-head"><th>Jogador</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="secao-correlacao" hidden>
+      <h2>🔗 Correlação de Acertos entre Jogadores</h2>
+      <p class="secao-nota">Com que frequência dois jogadores acertam/erram no mesmo boletim. Perto de 1 = tendem
+        a acertar juntos; perto de −1 = quando um acerta o outro costuma errar. Todas as épocas.</p>
+      <div class="table-scroll">
+        <table id="tabela-correlacao">
+          <thead><tr id="correlacao-head"><th>Jogador</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="vista-historico" hidden>
+    <div id="estado-historico" class="estado-msg">A carregar dados...</div>
+
+    <section id="secao-historico" hidden>
+      <h2>📜 Histórico de Boletins</h2>
+      <div class="historico-resumo" id="historico-resumo"></div>
+      <div class="historico-lista" id="historico-lista"></div>
+    </section>
+  </div>
+
+  <div id="vista-registar" hidden>
+    <section>
+      <h2>🎟️ Registar Boletim</h2>
+      <form id="form-boletim">
+        <div class="form-row">
+          <label>Data
+            <input type="date" id="boletim-data" required>
+          </label>
+          <label>Tipo de Jornada
+            <select id="boletim-tipo-jornada" required></select>
+          </label>
+        </div>
+        <div class="pernas-grid" id="boletim-pernas"></div>
+        <button type="submit">Registar Boletim</button>
+        <div class="form-msg" id="boletim-msg"></div>
+      </form>
+    </section>
+
+    <section>
+      <h2>🚫 Registar Falta</h2>
+      <form id="form-falta">
+        <div class="form-row">
+          <label>Data
+            <input type="date" id="falta-data" required>
+          </label>
+          <label>Jogador
+            <select id="falta-jogador" required></select>
+          </label>
+          <label>Motivo
+            <input type="text" id="falta-motivo" placeholder="opcional">
+          </label>
+        </div>
+        <button type="submit">Registar Falta</button>
+        <div class="form-msg" id="falta-msg"></div>
+      </form>
+    </section>
+
+    <section>
+      <h2>🏧 Registar Levantamento</h2>
+      <form id="form-levantamento">
+        <div class="form-row">
+          <label>Data
+            <input type="date" id="lev-data" required>
+          </label>
+          <label>Motivo
+            <input type="text" id="lev-motivo" placeholder="opcional">
+          </label>
+          <label>Valor (€)
+            <input type="number" id="lev-valor" step="0.01" min="0.01" required>
+          </label>
+          <label>Observações
+            <input type="text" id="lev-observacoes" placeholder="opcional">
+          </label>
+        </div>
+        <button type="submit">Registar Levantamento</button>
+        <div class="form-msg" id="lev-msg"></div>
+      </form>
+    </section>
+  </div>
+
+  <div id="vista-config" hidden>
+    <div id="estado-config" class="estado-msg">A carregar dados...</div>
+
+    <section id="secao-config" hidden>
+      <h2>⚙️ Configurações</h2>
+      <p class="secao-nota">Alterar um valor numérico (stake, multas) só afeta boletins registados a
+        partir da data de vigência escolhida — os já registados mantêm o valor que tinham. Jogadores,
+        desportos e tipos de jornada só podem ser adicionados aqui (nunca removidos, para não quebrar
+        estatísticas antigas).</p>
+
+      <div class="config-grid">
+        <div class="config-card" id="config-jogadores">
+          <h3>👥 Jogadores</h3>
+          <ul class="config-lista"></ul>
+          <form class="config-form-simples" data-action="adicionarJogador" data-campo="jogador">
+            <input type="text" placeholder="Nome do jogador" required>
+            <button type="submit">Adicionar</button>
+          </form>
+          <div class="form-msg"></div>
+        </div>
+
+        <div class="config-card" id="config-desportos">
+          <h3>🏀 Desportos</h3>
+          <ul class="config-lista"></ul>
+          <form class="config-form-simples" data-action="adicionarDesporto" data-campo="desporto">
+            <input type="text" placeholder="Nome do desporto" required>
+            <button type="submit">Adicionar</button>
+          </form>
+          <div class="form-msg"></div>
+        </div>
+
+        <div class="config-card" id="config-tipos-jornada">
+          <h3>🗂️ Tipos de Jornada</h3>
+          <ul class="config-lista"></ul>
+          <form class="config-form-simples" data-action="adicionarTipoJornada" data-campo="tipoJornada">
+            <input type="text" placeholder="Nome do tipo de jornada" required>
+            <button type="submit">Adicionar</button>
+          </form>
+          <div class="form-msg"></div>
+        </div>
+
+        <div class="config-card" id="config-stake">
+          <h3>💶 Stake (Montante por Combinação)</h3>
+          <div class="config-valor-atual"></div>
+          <table class="config-historico-tabela"><tbody></tbody></table>
+          <form class="config-form-valor" data-campo="montante_por_combinacao">
+            <label>Novo valor (€) <input type="number" step="0.01" min="0.01" required></label>
+            <label>Em vigor a partir de <input type="date" required></label>
+            <button type="submit">Definir</button>
+          </form>
+          <div class="form-msg"></div>
+        </div>
+
+        <div class="config-card" id="config-odd-minima">
+          <h3>📉 Odd Mínima (para duplicar multa de erro)</h3>
+          <div class="config-valor-atual"></div>
+          <table class="config-historico-tabela"><tbody></tbody></table>
+          <form class="config-form-valor" data-campo="odd_minima">
+            <label>Novo valor <input type="number" step="0.01" min="1" required></label>
+            <label>Em vigor a partir de <input type="date" required></label>
+            <button type="submit">Definir</button>
+          </form>
+          <div class="form-msg"></div>
+        </div>
+      </div>
+
+      <div class="config-tabelas-multas">
+        <div class="config-card config-card--tabela" id="config-multa-erros">
+          <h3>🧾 Multas por Erros no Boletim</h3>
+          <p class="secao-nota">Uma linha por nº de jogadores que erraram no boletim (0 a N).</p>
+          <table class="config-tabela-atual">
+            <thead><tr><th>Nº Errantes</th><th>Multa Individual</th><th>Multa Total Boletim</th><th>Estado</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button type="button" class="btn-definir-tabela" data-tabela="erros">✏️ Definir nova tabela</button>
+          <div class="config-form-tabela-wrap" hidden></div>
+        </div>
+
+        <div class="config-card config-card--tabela" id="config-multa-atrasos">
+          <h3>🕒 Multas por Atraso (por mês)</h3>
+          <table class="config-tabela-atual">
+            <thead><tr><th>Nº Atrasos no Mês</th><th>Multa</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button type="button" class="btn-definir-tabela" data-tabela="atrasos">✏️ Definir nova tabela</button>
+          <div class="config-form-tabela-wrap" hidden></div>
+        </div>
+
+        <div class="config-card config-card--tabela" id="config-multa-faltas">
+          <h3>🚫 Multas por Falta de Prognóstico (por mês)</h3>
+          <table class="config-tabela-atual">
+            <thead><tr><th>Nº Faltas no Mês</th><th>Multa</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <button type="button" class="btn-definir-tabela" data-tabela="faltas">✏️ Definir nova tabela</button>
+          <div class="config-form-tabela-wrap" hidden></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>Bet Tracker — dados a partir da Google Sheet do grupo.</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/registar.js"></script>
+<script src="js/config-page.js"></script>
+</body>
+</html>

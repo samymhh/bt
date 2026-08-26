@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+node_modules/
+.claude/
+
+# Fixtures/artefactos gerados localmente para testar o frontend sem depender
+# do deployment Apps Script — nunca fazem parte do site publicado.
+webapp/dashboard.json
