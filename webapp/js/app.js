@@ -208,6 +208,7 @@
       function () { renderClassificacao(fatia.classificacao); },
       function () { renderIndividual(fatia.performanceIndividual); },
       function () { renderMultas(fatia.multasPorTipo, fatia.multasPorJogador); },
+      function () { renderFaltas(fatia.faltas); },
       function () { renderDesporto(fatia.performanceDesporto, fatia.performanceDesportoIndividual); },
       function () { renderCorrelacao(fatia.correlacao); },
       function () { renderHistorico(payload.historico, epoca); },
@@ -369,6 +370,24 @@
       tr.innerHTML = '<td>' + esc(m.jogador) + '</td><td>' + fmtEuro(m.pendentes) + '</td><td>' + m.nAtrasos + '</td><td>' + fmtEuro(m.multaAtraso) + '</td>'
         + '<td>' + m.nErros + '</td><td>' + fmtEuro(m.multaErro) + '</td><td>' + m.nFaltas + '</td>'
         + '<td>' + fmtEuro(m.multaFalta) + '</td><td>' + fmtEuro(m.totalMultas) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderFaltas(faltas) {
+    var tbody = document.querySelector('#tabela-faltas tbody');
+    tbody.innerHTML = '';
+    if (!faltas || faltas.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="estado-msg">Sem faltas registadas nesta época.</td></tr>';
+      return;
+    }
+    faltas.forEach(function (f) {
+      var celulaMulta = f.estado === 'Pago'
+        ? fmtEuro(f.multa) + ' <span class="badge-pago">✅ Pago</span>'
+        : fmtEuro(f.multa) + ' <button type="button" class="btn-marcar-pago" data-sheet="MultaFaltas" data-linha="' + f.linha + '">💶 Marcar pago</button>';
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td>' + fmtData(f.data) + '</td><td>' + esc(f.jogador) + '</td>'
+        + '<td>' + esc(f.motivo || '—') + '</td><td>' + celulaMulta + '</td>';
       tbody.appendChild(tr);
     });
   }
@@ -551,12 +570,23 @@
       : '<span class="boletim-lucro">—</span>';
 
     var pernas = b.pernas.map(function (p) {
+      var multaPerna = (p.multaAtraso || 0) + (p.multaErro || 0);
+      var celulaMulta;
+      if (!multaPerna) {
+        celulaMulta = '<td>—</td>';
+      } else if (p.pago === 'Pago') {
+        celulaMulta = '<td>' + fmtEuro(multaPerna) + ' <span class="badge-pago">✅ Pago</span></td>';
+      } else {
+        celulaMulta = '<td>' + fmtEuro(multaPerna)
+          + ' <button type="button" class="btn-marcar-pago" data-sheet="Apostas" data-linha="' + p.linha + '">💶 Marcar pago</button></td>';
+      }
       return '<tr class="perna-' + (p.resultado === 'Acertou' ? 'ok' : (p.resultado === 'Errou' ? 'ko' : 'pend')) + '">'
         + '<td>' + (ICONE_RESULTADO[p.resultado] || '⏳') + ' ' + esc(p.jogador) + (p.atraso === 'Sim' ? ' <span title="Entregou com atraso">🕒</span>' : '') + '</td>'
         + '<td>' + esc(p.desporto) + '</td>'
         + '<td>' + esc(p.partida || '—') + '</td>'
         + '<td>' + esc(p.prognostico) + '</td>'
         + '<td>' + fmtNum(p.odd) + '</td>'
+        + celulaMulta
         + '</tr>';
     }).join('');
 
@@ -576,7 +606,7 @@
           + ' · Multas do boletim <strong>' + fmtEuro(b.multasBoletim) + '</strong></div>'
         : '<div class="boletim-meta">Boletim por fechar — usa "Editar boletim" para marcar os resultados.</div>')
       + '<div class="table-scroll"><table class="pernas-tabela">'
-      + '<thead><tr><th>Jogador</th><th>Desporto</th><th>Partida</th><th>Prognóstico</th><th>Odd</th></tr></thead>'
+      + '<thead><tr><th>Jogador</th><th>Desporto</th><th>Partida</th><th>Prognóstico</th><th>Odd</th><th>Multa</th></tr></thead>'
       + '<tbody>' + pernas + '</tbody></table></div>'
       + '</div>'
       + '<button type="button" class="btn-editar-boletim">✏️ Editar boletim</button>'
@@ -597,6 +627,25 @@
 
     return det;
   }
+
+  /** Delegado no <body> — cobre o botão "Marcar pago" tanto nas pernas do
+   * histórico como na tabela de Faltas de Prognóstico (ambas recriam o seu
+   * innerHTML a cada render, por isso um listener por botão seria perdido). */
+  document.body.addEventListener('click', function (ev) {
+    var btn = ev.target.closest && ev.target.closest('.btn-marcar-pago');
+    if (!btn) return;
+    ev.preventDefault();
+    btn.disabled = true;
+    var textoOriginal = btn.textContent;
+    btn.textContent = 'A gravar…';
+    enviarEscrita_('marcarPago', { sheet: btn.dataset.sheet, linha: Number(btn.dataset.linha) })
+      .then(function () { window.BetTrackerApp.refresh(); })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = textoOriginal;
+        alert('Não foi possível marcar como pago: ' + err.message);
+      });
+  });
 
   function renderHistorico(historico, epoca) {
     var lista = document.getElementById('historico-lista');

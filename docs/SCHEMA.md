@@ -53,11 +53,12 @@ Uma linha por **perna** de boletim. Um boletim = N linhas consecutivas com o mes
 
 **Nota sobre `pago`:** no Excel original a coluna V tem uma fórmula que sugere o estado
 (`Pendente` / `Por Pagar` / `Sem Multa`), mas em várias linhas o utilizador substitui manualmente
-o valor por `"Pago"` assim que a multa é liquidada — a fórmula é substituída por texto fixo. Para
-replicar este comportamento sem perder a robustez de cálculo, a Sheet guarda o estado real
-(`pago`) como campo editável; o Apps Script calcula um valor **sugerido** (mesma lógica da fórmula
-original) só para quando `pago` estiver vazio, e o formulário de escrita (Fase 3) oferece um botão
-"Marcar como Pago" que escreve `"Pago"` diretamente nesta coluna.
+o valor por `"Pago"` assim que a multa é liquidada — a fórmula é substituída por texto fixo. A app
+replica isto tratando **qualquer valor diferente de `"Pago"` como pendente** (não só `"Por Pagar"`
+explícito) — um boletim registado pela app fica sempre com `pago` em branco até alguém marcar,
+e ainda assim entra logo nos "Pendentes"/`multasPendentes`, sem precisar de nenhum passo extra. Na
+página **Histórico**, cada perna com multa (erro/atraso) tem um botão "💶 Marcar pago" que chama
+`?action=marcarPago` e escreve `"Pago"` diretamente nesta coluna.
 
 Todas as restantes colunas do Excel original (`K` a `T`, `W`: Odd Total, Ganhos Possíveis, Erros,
 Estado, Ganho Real, Multas Boletim, Lucro, Multa Atraso, Multa Erro, Multa Total, Época) **não são
@@ -70,7 +71,7 @@ guardadas** — são sempre calculadas pelo Apps Script (ver secção 3).
 | data     | data   | |
 | jogador  | texto  | |
 | motivo   | texto livre (opcional) | |
-| estado   | "Por Pagar" / "Pago" | igual à `pago` de Apostas — editável |
+| estado   | "Por Pagar" / "Pago" | igual à `pago` de Apostas — editável; qualquer valor diferente de "Pago" conta como pendente |
 
 `Nº Falta no Mês` e `Multa (€)` deixam de ser guardados — calculados pelo Apps Script.
 
@@ -191,9 +192,11 @@ Um único projeto Apps Script ligado à Sheet, publicado como Web App (`doGet`/`
   - `epocasDisponiveis` — derivadas das datas reais dos dados (ver abaixo);
   - `porEpoca` — mapa `{ "Todas": {kpis, evolucaoBanca, classificacao, performanceIndividual,
     multasPorJogador, multasPorTipo, performanceDesporto, performanceDesportoIndividual,
-    correlacao}, "25/26": {...}, ... }` com a fatia de **todas** as épocas já calculada. Só
+    correlacao, faltas}, "25/26": {...}, ... }` com a fatia de **todas** as épocas já calculada. Só
     `kpis.bancaAtual` e `kpis.totalLevantado` ficam sempre globais (tal como no Excel original) —
-    tudo o resto dentro de cada fatia está filtrado para essa época;
+    tudo o resto dentro de cada fatia está filtrado para essa época. `faltas` é a lista crua das
+    faltas de prognóstico (não só a soma), cada uma com `linha` — para o botão "Marcar pago" no
+    frontend chamar `?action=marcarPago` com essa referência;
   - `historico` — todos os boletins **com dados** (incluindo os **pendentes**, que não entram em
     cálculo nenhum), do mais recente para o mais antigo, cada um com a sua `epoca` e as suas pernas.
     Ignora as linhas placeholder sem data e sem pernas preenchidas que vieram da migração do Excel
@@ -201,10 +204,12 @@ Um único projeto Apps Script ligado à Sheet, publicado como Web App (`doGet`/`
   - `config` — para o frontend popular os formulários sem um 2º pedido.
 - `GET ?action=config` → só a config (mantido para diagnóstico e como fallback do frontend).
 
-> **Porque não há `&epoca=`**: o filtro de época mudava apenas KPIs e Evolução da Banca, mas obrigava
-> a recarregar as 11 abas e a recalcular tudo do zero a cada troca — era a causa do atraso sentido.
-> Agora o cálculo é feito numa passagem só (`computarBase_`) e as fatias por época saem de
-> `fatiaEpoca_`, que é barata. O frontend troca de época em memória, sem rede.
+> **Porque não há `&epoca=`**: trocar de época obrigava a recarregar as 11 abas e a recalcular tudo
+> do zero a cada troca — era a causa do atraso sentido. Agora o cálculo caro (agrupar boletins,
+> resultados, multas por perna) é feito numa passagem só sobre TODOS os dados (`computarBase_`); os
+> rollups por jogador que dependem da época (`rollupsPorJogador_`) e os KPIs são recalculados por
+> cima disso uma vez por época dentro de `fatiaEpoca_` — barato, porque só filtra/soma o que já foi
+> calculado. O frontend troca de época em memória, sem rede.
 
 > **Épocas**: `Config_Epocas` deixou de ser lida. `epocasDosDados_` deriva-as das datas de
 > `Apostas`/`MultaFaltas`/`Levantamentos` via `calcularEpoca_` + `mes_inicio_epoca`, ordenadas da
@@ -222,8 +227,9 @@ Um único projeto Apps Script ligado à Sheet, publicado como Web App (`doGet`/`
   nunca apaga/duplica.
 - `POST ?action=registarFalta` — body com data/jogador/motivo.
 - `POST ?action=registarLevantamento` — body com data/motivo/valor/observações.
-- `POST ?action=marcarPago` — body com referência (linha de `Apostas` ou `MultaFaltas`) → escreve
-  `"Pago"` no campo `pago`/`estado`.
+- `POST ?action=marcarPago` — body com referência (`sheet: "Apostas"|"MultaFaltas"`, `linha`) →
+  escreve `"Pago"` no campo `pago`/`estado`. No frontend: botão "💶 Marcar pago" em cada perna com
+  multa no Histórico, e em cada falta na tabela "Faltas de Prognóstico registadas" (secção Multas).
 - `POST ?action=adicionarJogador` / `adicionarDesporto` / `adicionarTipoJornada` — acrescenta um
   valor às respetivas listas (`Config_Jogadores`/`Config_Desportos`/`Config_TiposJornada`); rejeita
   duplicados. Não há remoção (quebraria estatísticas de boletins já registados).

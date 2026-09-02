@@ -306,7 +306,10 @@ function rollupsPorJogador_(concluidos, multaFaltas, config) {
       var mj = multasJog[p.jogador]; if (!mj) return;
       if (p.atraso === 'Sim') { mj.nAtrasos++; mj.multaAtraso += p._multaAtraso; }
       if (p.resultado === 'Errou' && p.odd !== 1) { mj.nErros++; mj.multaErro += p._multaErro; }
-      if (p.pago === 'Por Pagar') mj.pendentes += p._multaTotal;
+      // Pendente = tudo o que NÃO está explicitamente "Pago" (boletins novos
+      // ficam com `pago` em branco, não "Por Pagar" — só passam a "Pago"
+      // depois de alguém marcar via marcarPago_; até lá contam como por pagar).
+      if (p.pago !== 'Pago') mj.pendentes += p._multaTotal;
 
       if (p.desporto && desportoGlobal[p.desporto]) {
         var dg = desportoGlobal[p.desporto];
@@ -322,7 +325,7 @@ function rollupsPorJogador_(concluidos, multaFaltas, config) {
   multaFaltas.forEach(function (f) {
     var mj = multasJog[f.jogador]; if (!mj) return;
     mj.nFaltas++; mj.multaFalta += f._multa;
-    if (f.estado === 'Por Pagar') mj.pendentes += f._multa;
+    if (f.estado !== 'Pago') mj.pendentes += f._multa;
   });
 
   var performanceIndividual = jogadores.map(function (j) {
@@ -493,9 +496,9 @@ function fatiaEpoca_(base, dados, epocaFiltro) {
     oddMedia: media_(pernasFiltradas.map(function (p) { return p.odd; }).filter(function (o) { return o != null; })),
     multasTotais: pernasFiltradas.reduce(function (s, p) { return s + p._multaTotal; }, 0)
       + multaFaltasFiltradas.reduce(function (s, f) { return s + f._multa; }, 0),
-    multasPendentes: pernasFiltradas.filter(function (p) { return p.pago === 'Por Pagar'; })
+    multasPendentes: pernasFiltradas.filter(function (p) { return p.pago !== 'Pago'; })
       .reduce(function (s, p) { return s + p._multaTotal; }, 0)
-      + multaFaltasFiltradas.filter(function (f) { return f.estado === 'Por Pagar'; }).reduce(function (s, f) { return s + f._multa; }, 0),
+      + multaFaltasFiltradas.filter(function (f) { return f.estado !== 'Pago'; }).reduce(function (s, f) { return s + f._multa; }, 0),
     multasFaltaPick: multaFaltasFiltradas.reduce(function (s, f) { return s + f._multa; }, 0),
     nFaltasRegistadas: multaFaltasFiltradas.length,
   };
@@ -511,6 +514,15 @@ function fatiaEpoca_(base, dados, epocaFiltro) {
     evolucaoBanca: evolucaoBancaFiltrada.map(function (pt) {
       return { boletim: pt.boletim, data: pt.data.toISOString().slice(0, 10), banca: pt.banca };
     }),
+    // Lista "crua" das faltas de prognóstico (não só a soma) — para o frontend
+    // conseguir listar cada uma com um botão "Marcar como pago" (linha aponta
+    // para a linha real em MultaFaltas, usada por `?action=marcarPago`).
+    faltas: multaFaltasFiltradas.map(function (f) {
+      return {
+        data: f.data.toISOString().slice(0, 10), jogador: f.jogador, motivo: f.motivo || '',
+        estado: f.estado, multa: f._multa, linha: f.linha,
+      };
+    }).sort(function (a, b) { return b.data.localeCompare(a.data); }),
     classificacao: rollups.classificacao,
     performanceIndividual: rollups.performanceIndividual,
     multasPorJogador: rollups.multasPorJogador,
@@ -565,6 +577,11 @@ function historicoBoletins_(base) {
           resultado: p.resultado,
           pago: p.pago,
           linha: p.linha,
+          // Só definidos para boletins concluídos (calcularMultasPorPerna_ só
+          // corre sobre esses) — o frontend usa isto para saber se há algo por
+          // pagar nesta perna e mostrar o botão "Marcar como pago".
+          multaAtraso: p._multaAtraso || 0,
+          multaErro: p._multaErro || 0,
         };
       }),
     };
