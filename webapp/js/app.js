@@ -113,7 +113,12 @@
   // (por browser/dispositivo) para a próxima abertura mostrar dados de imediato
   // em vez do ecrã "A carregar dados...", enquanto os dados frescos vêm a caminho
   // em segundo plano.
-  var CACHE_KEY_DASHBOARD_ = 'bt_dashboard_cache_v1';
+  // "v2": incrementar sempre que o FORMATO do payload mudar (ex: campos que
+  // passaram de globais a por-época) — uma cópia guardada com o formato
+  // anterior deixa de bater certo com o que o resto do código espera e o
+  // localStorage.getItem simplesmente não a encontra (chave nova), forçando
+  // um pedido fresco em vez de tentar reaproveitar dados incompatíveis.
+  var CACHE_KEY_DASHBOARD_ = 'bt_dashboard_cache_v2';
 
   function lerCacheDashboard_() {
     try {
@@ -194,14 +199,21 @@
   function renderEpoca(epoca) {
     if (!payload) return;
     var fatia = payload.porEpoca[epoca] || payload.porEpoca['Todas'];
-    renderKpis(fatia.kpis);
-    renderBanca(fatia.evolucaoBanca);
-    renderClassificacao(fatia.classificacao);
-    renderIndividual(fatia.performanceIndividual);
-    renderMultas(fatia.multasPorTipo, fatia.multasPorJogador);
-    renderDesporto(fatia.performanceDesporto, fatia.performanceDesportoIndividual);
-    renderCorrelacao(fatia.correlacao);
-    renderHistorico(payload.historico, epoca);
+    // Cada secção isolada num try/catch: se uma falhar (ex: payload num
+    // formato inesperado), as outras — Histórico incluído — continuam a
+    // renderizar em vez de o ecrã inteiro ficar vazio por causa de uma só.
+    [
+      function () { renderKpis(fatia.kpis); },
+      function () { renderBanca(fatia.evolucaoBanca); },
+      function () { renderClassificacao(fatia.classificacao); },
+      function () { renderIndividual(fatia.performanceIndividual); },
+      function () { renderMultas(fatia.multasPorTipo, fatia.multasPorJogador); },
+      function () { renderDesporto(fatia.performanceDesporto, fatia.performanceDesportoIndividual); },
+      function () { renderCorrelacao(fatia.correlacao); },
+      function () { renderHistorico(payload.historico, epoca); },
+    ].forEach(function (passo) {
+      try { passo(); } catch (e) { console.error('Erro a renderizar uma secção do dashboard:', e); }
+    });
   }
 
   function kpiCard(label, valor, classe, nota) {
