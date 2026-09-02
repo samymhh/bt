@@ -230,6 +230,9 @@ Um único projeto Apps Script ligado à Sheet, publicado como Web App (`doGet`/`
 - `POST ?action=marcarPago` — body com referência (`sheet: "Apostas"|"MultaFaltas"`, `linha`) →
   escreve `"Pago"` no campo `pago`/`estado`. No frontend: botão "💶 Marcar pago" em cada perna com
   multa no Histórico, e em cada falta na tabela "Faltas de Prognóstico registadas" (secção Multas).
+- `POST ?action=apagarBoletim` — body `{idBoletim}` → apaga a sério as N linhas desse boletim em
+  `Apostas` (não é um estado escondido, desaparece da Sheet). Sem undo pela app. No frontend: botão
+  "🗑️ Apagar boletim" no Histórico, com confirmação antes de enviar.
 - `POST ?action=adicionarJogador` / `adicionarDesporto` / `adicionarTipoJornada` — acrescenta um
   valor às respetivas listas (`Config_Jogadores`/`Config_Desportos`/`Config_TiposJornada`); rejeita
   duplicados. Não há remoção (quebraria estatísticas de boletins já registados).

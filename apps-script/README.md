@@ -82,6 +82,23 @@ qualquer alteração feita em Configurações fica sem data — deixa de existir
 o futuro" até a coluna ser adicionada. Adicionar/editar jogadores, desportos e tipos de jornada não
 precisa desta coluna (não são versionados).
 
+## Saldar histórico antigo (`Manutencao.gs`) — passo único
+
+A correção que fez `pago`/`estado` em branco contar como "por pagar" (em vez de só `"Por Pagar"`
+explícito) faz com que **todo o histórico antigo** — que nunca teve esse valor escrito, mas já foi
+liquidado na vida real — passe a aparecer como pendente. [`Manutencao.gs`](Manutencao.gs) marca tudo
+isso como saldado de uma vez, deixando por pagar só o que for a partir da data que definires.
+
+1. Copia o conteúdo de [`Manutencao.gs`](Manutencao.gs) para um ficheiro novo chamado `Manutencao`
+   no editor do Apps Script.
+2. Confirma/ajusta a constante `DATA_CORTE_SALDO_` no topo do ficheiro (tudo **antes** dessa data
+   é marcado como saldado; essa data e depois fica intocada).
+3. Seleciona `saldarHistoricoAntigo_` no menu de funções → **Executar**.
+4. Confere quantas linhas mudaram em **Ver → Registos**.
+
+Podes correr mais que uma vez sem problema (não muda nada da 2ª vez em diante), e podes apagar o
+ficheiro depois — não é preciso manter para a app funcionar no dia a dia.
+
 ## Cache do dashboard (`?action=dashboard`)
 
 O payload completo (todas as épocas + histórico + config) fica em cache partilhada

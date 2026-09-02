@@ -535,6 +535,22 @@ footer {
   border-color: var(--baseline);
 }
 
+.btn-apagar-boletim {
+  margin: 10px 0 0 8px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn-apagar-boletim:hover {
+  color: var(--critical-text);
+  border-color: var(--critical-text);
+}
+
 .boletim-edit-wrap {
   margin-top: 12px;
   padding-top: 12px;

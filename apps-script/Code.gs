@@ -20,6 +20,10 @@
  *   POST { action: "registarFalta", data, jogador, motivo }
  *   POST { action: "registarLevantamento", data, motivo, valor, observacoes }
  *   POST { action: "marcarPago", sheet: "Apostas"|"MultaFaltas", linha }
+ *   POST { action: "apagarBoletim", idBoletim }
+ *       — apaga a sério as N linhas desse boletim em `Apostas` (não é um estado
+ *         "cancelado" nem fica escondido — desaparece da Sheet). Para testar ou
+ *         corrigir um registo por engano; usar com cuidado, não há undo.
  *   POST { action: "adicionarJogador", jogador }
  *   POST { action: "adicionarDesporto", desporto }
  *   POST { action: "adicionarTipoJornada", tipoJornada }
@@ -73,6 +77,8 @@ function doPost(e) {
       resposta = registarLevantamento_(body);
     } else if (body.action === 'marcarPago') {
       resposta = marcarPago_(body);
+    } else if (body.action === 'apagarBoletim') {
+      resposta = apagarBoletim_(body);
     } else if (body.action === 'adicionarJogador') {
       resposta = adicionarJogador_(body);
     } else if (body.action === 'adicionarDesporto') {
@@ -379,6 +385,30 @@ function marcarPago_(body) {
   if (!col) throw new Error('Coluna ' + campo + ' não encontrada em ' + body.sheet + '.');
   sheet.getRange(linha, col).setValue('Pago');
   return { ok: true };
+}
+
+/** Apaga a SÉRIO as N linhas (uma por jogador) de um boletim em `Apostas` —
+ * para testar ou corrigir um registo por engano. Não há undo (a não ser
+ * restaurar pelo histórico de versões da própria Google Sheet). Não mexe em
+ * nada mais (MultaFaltas, Levantamentos, Config_*). */
+function apagarBoletim_(body) {
+  if (!body.idBoletim) throw new Error('idBoletim em falta.');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Apostas');
+  var cabecalho = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var colId = cabecalho.indexOf('id_boletim');
+  if (colId < 0) throw new Error('Coluna id_boletim não encontrada.');
+  var valores = sheet.getDataRange().getValues();
+  var linhasParaApagar = [];
+  for (var i = 1; i < valores.length; i++) {
+    if (String(valores[i][colId]) === String(body.idBoletim)) linhasParaApagar.push(i + 1);
+  }
+  if (linhasParaApagar.length === 0) throw new Error('Boletim não encontrado: ' + body.idBoletim);
+  // Apagar de baixo para cima — apagar de cima para baixo desalinha os
+  // números de linha das que faltam apagar a seguir.
+  linhasParaApagar.sort(function (a, b) { return b - a; });
+  linhasParaApagar.forEach(function (linha) { sheet.deleteRow(linha); });
+  return { ok: true, linhasApagadas: linhasParaApagar.length };
 }
 
 function jsonOutput_(obj) {

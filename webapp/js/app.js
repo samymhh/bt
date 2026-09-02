@@ -610,6 +610,7 @@
       + '<tbody>' + pernas + '</tbody></table></div>'
       + '</div>'
       + '<button type="button" class="btn-editar-boletim">✏️ Editar boletim</button>'
+      + '<button type="button" class="btn-apagar-boletim">🗑️ Apagar boletim</button>'
       + '<div class="boletim-edit-wrap" hidden></div>'
       + '</div>';
 
@@ -623,6 +624,23 @@
       det.querySelector('.boletim-view').hidden = true;
       det.querySelector('.btn-editar-boletim').hidden = true;
       editWrap.hidden = false;
+    });
+
+    det.querySelector('.btn-apagar-boletim').addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var btn = ev.currentTarget;
+      // Apaga mesmo da Sheet (não é um "cancelado" escondido) — por isso a
+      // confirmação explícita, sem forma de desfazer a partir da app.
+      if (!confirm('Apagar o boletim ' + b.id + ' (' + fmtData(b.data) + ')? Isto remove-o mesmo da Sheet — não há undo na app.')) return;
+      btn.disabled = true;
+      btn.textContent = 'A apagar…';
+      enviarEscrita_('apagarBoletim', { idBoletim: b.id })
+        .then(function () { window.BetTrackerApp.refresh(); })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.textContent = '🗑️ Apagar boletim';
+          alert('Não foi possível apagar: ' + err.message);
+        });
     });
 
     return det;
