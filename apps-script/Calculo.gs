@@ -259,42 +259,14 @@ function correlacaoPearson_(xs, ys) {
 }
 
 /**
- * Passagem única sobre os dados: agrupa boletins, calcula resultados/multas e
- * todos os rollups que NÃO dependem da época selecionada (classificação,
- * performance individual, multas, desporto, correlação) + a série global da
- * banca. É a parte cara — corre uma só vez por pedido.
+ * Rollups por jogador que DEPENDEM da época (classificação, performance
+ * individual, multas, desporto, correlação) — recebem já os boletins/faltas
+ * filtrados pela época pedida (ou todos, para "Todas"). Chamada uma vez por
+ * época dentro de `fatiaEpoca_`: é barata (só percorre o que já foi filtrado),
+ * a parte cara é `calcularResultadoBoletim_`/`calcularMultasPorPerna_`, essas
+ * sim feitas uma única vez em `computarBase_` sobre TODOS os boletins.
  */
-function computarBase_(dados) {
-  var config = dados.config;
-  var mesInicio = config.geral.mesInicioEpoca;
-
-  var boletins = agruparBoletins_(dados.apostas, config.geral.numeroJogadores);
-  var concluidos = boletins.filter(function (b) { return b.concluido && b.data; });
-  concluidos.sort(function (a, b) { return a.data - b.data; });
-  concluidos.forEach(function (b) { b._resultado = calcularResultadoBoletim_(b, configParaData_(config, b.data)); });
-  calcularMultasPorPerna_(concluidos, config);
-
-  var multaFaltas = calcularMultasFaltas_(dados.multaFaltas, config);
-
-  // --- Banca global e evolução ---
-  var eventos = [];
-  concluidos.forEach(function (b) { eventos.push({ data: b.data, delta: b._lucro, tipo: 'boletim', id: b.id }); });
-  multaFaltas.forEach(function (f) { eventos.push({ data: f.data, delta: f._multa, tipo: 'multaFalta' }); });
-  dados.levantamentos.forEach(function (l) { eventos.push({ data: l.data, delta: -l.valor, tipo: 'levantamento' }); });
-  eventos.sort(function (a, b) {
-    var d = a.data - b.data;
-    if (d !== 0) return d;
-    return (a.tipo === 'boletim' ? 1 : 0) - (b.tipo === 'boletim' ? 1 : 0);
-  });
-  var banca = config.geral.bancaInicial;
-  var evolucaoBanca = [];
-  eventos.forEach(function (ev) {
-    banca += ev.delta;
-    if (ev.tipo === 'boletim') evolucaoBanca.push({ boletim: ev.id, data: ev.data, banca: banca });
-  });
-  var bancaAtual = banca;
-
-  // --- Rollups por jogador (streaks, performance, multas, desporto, correlação) ---
+function rollupsPorJogador_(concluidos, multaFaltas, config) {
   var jogadores = config.jogadores;
   var estadoSeq = {}, perf = {}, multasJog = {}, desportoIndiv = {}, acertoSeries = {};
   jogadores.forEach(function (j) {
@@ -382,7 +354,7 @@ function computarBase_(dados) {
   var multasPorTipo = [
     { tipo: 'Atraso', valor: multasPorJogador.reduce(function (s, m) { return s + m.multaAtraso; }, 0) },
     { tipo: 'Erro Prognóstico', valor: multasPorJogador.reduce(function (s, m) { return s + m.multaErro; }, 0) },
-    { tipo: 'Falta de Pick', valor: multasPorJogador.reduce(function (s, m) { return s + m.multaFalta; }, 0) },
+    { tipo: 'Falta de Prognóstico', valor: multasPorJogador.reduce(function (s, m) { return s + m.multaFalta; }, 0) },
   ];
 
   var performanceDesporto = config.desportos.map(function (d) {
@@ -418,10 +390,6 @@ function computarBase_(dados) {
     }, null);
   }
 
-  var indisciplina = multasPorJogador.map(function (m) {
-    return { jogador: m.jogador, valor: m.nAtrasos + m.nErros };
-  });
-
   function classItem(categoria, item, campo) {
     return item ? { categoria: categoria, jogador: item.jogador, valor: item[campo] } : { categoria: categoria, jogador: null, valor: null };
   }
@@ -434,8 +402,54 @@ function computarBase_(dados) {
     classItem('Maior Assiduidade', argExtremo(multasPorJogador, 'nAtrasos', false), 'nAtrasos'),
     classItem('Pior Assiduidade', argExtremo(multasPorJogador, 'nAtrasos', true), 'nAtrasos'),
     classItem('Maior Contribuição em Multas', argExtremo(multasPorJogador, 'totalMultas', true), 'totalMultas'),
-    classItem('Maior Indisciplina', argExtremo(indisciplina, 'valor', true), 'valor'),
   ];
+
+  return {
+    performanceIndividual: performanceIndividual,
+    multasPorJogador: multasPorJogador,
+    multasPorTipo: multasPorTipo,
+    performanceDesporto: performanceDesporto,
+    performanceDesportoIndividual: performanceDesportoIndividual,
+    correlacao: correlacao,
+    classificacao: classificacao,
+  };
+}
+
+/**
+ * Passagem única sobre os dados: agrupa boletins, calcula resultados/multas e
+ * a série global da banca — a parte cara que NÃO depende da época (é feita
+ * sobre TODOS os boletins uma única vez). Os rollups por jogador (que agora
+ * dependem da época) são calculados depois, por época, em `fatiaEpoca_`.
+ */
+function computarBase_(dados) {
+  var config = dados.config;
+  var mesInicio = config.geral.mesInicioEpoca;
+
+  var boletins = agruparBoletins_(dados.apostas, config.geral.numeroJogadores);
+  var concluidos = boletins.filter(function (b) { return b.concluido && b.data; });
+  concluidos.sort(function (a, b) { return a.data - b.data; });
+  concluidos.forEach(function (b) { b._resultado = calcularResultadoBoletim_(b, configParaData_(config, b.data)); });
+  calcularMultasPorPerna_(concluidos, config);
+
+  var multaFaltas = calcularMultasFaltas_(dados.multaFaltas, config);
+
+  // --- Banca global e evolução ---
+  var eventos = [];
+  concluidos.forEach(function (b) { eventos.push({ data: b.data, delta: b._lucro, tipo: 'boletim', id: b.id }); });
+  multaFaltas.forEach(function (f) { eventos.push({ data: f.data, delta: f._multa, tipo: 'multaFalta' }); });
+  dados.levantamentos.forEach(function (l) { eventos.push({ data: l.data, delta: -l.valor, tipo: 'levantamento' }); });
+  eventos.sort(function (a, b) {
+    var d = a.data - b.data;
+    if (d !== 0) return d;
+    return (a.tipo === 'boletim' ? 1 : 0) - (b.tipo === 'boletim' ? 1 : 0);
+  });
+  var banca = config.geral.bancaInicial;
+  var evolucaoBanca = [];
+  eventos.forEach(function (ev) {
+    banca += ev.delta;
+    if (ev.tipo === 'boletim') evolucaoBanca.push({ boletim: ev.id, data: ev.data, banca: banca });
+  });
+  var bancaAtual = banca;
 
   return {
     config: config,
@@ -445,19 +459,14 @@ function computarBase_(dados) {
     multaFaltas: multaFaltas,
     evolucaoBanca: evolucaoBanca,
     bancaAtual: bancaAtual,
-    classificacao: classificacao,
-    performanceIndividual: performanceIndividual,
-    multasPorJogador: multasPorJogador,
-    multasPorTipo: multasPorTipo,
-    performanceDesporto: performanceDesporto,
-    performanceDesportoIndividual: performanceDesportoIndividual,
-    correlacao: correlacao,
   };
 }
 
 /**
- * Parte que DEPENDE da época: KPIs + os pontos da série da banca a mostrar.
- * Barata — só filtra e soma sobre o que `computarBase_` já calculou.
+ * Parte que DEPENDE da época: KPIs, pontos da série da banca, e todos os
+ * rollups por jogador (classificação, performance individual, multas,
+ * desporto, correlação) — filtrados para a época pedida. Barata — só filtra
+ * e soma sobre o que `computarBase_` já calculou.
  * (Banca Atual e Total Levantado ficam sempre globais, como no Excel.)
  */
 function fatiaEpoca_(base, dados, epocaFiltro) {
@@ -495,11 +504,20 @@ function fatiaEpoca_(base, dados, epocaFiltro) {
     return todasEpoca || calcularEpoca_(pt.data, mesInicio) === epocaFiltro;
   });
 
+  var rollups = rollupsPorJogador_(concluidosFiltrados, multaFaltasFiltradas, config);
+
   return {
     kpis: kpis,
     evolucaoBanca: evolucaoBancaFiltrada.map(function (pt) {
       return { boletim: pt.boletim, data: pt.data.toISOString().slice(0, 10), banca: pt.banca };
     }),
+    classificacao: rollups.classificacao,
+    performanceIndividual: rollups.performanceIndividual,
+    multasPorJogador: rollups.multasPorJogador,
+    multasPorTipo: rollups.multasPorTipo,
+    performanceDesporto: rollups.performanceDesporto,
+    performanceDesportoIndividual: rollups.performanceDesportoIndividual,
+    correlacao: rollups.correlacao,
   };
 }
 
@@ -555,8 +573,9 @@ function historicoBoletins_(base) {
 
 /**
  * Ponto de entrada do endpoint `?action=dashboard`: devolve TUDO num só payload
- * — as secções globais uma vez, as fatias de todas as épocas, o histórico e a
- * config. O frontend não volta a pedir nada para trocar de época.
+ * — as fatias de todas as épocas (cada uma já com kpis, banca e todos os
+ * rollups por jogador filtrados), o histórico e a config. O frontend não volta
+ * a pedir nada para trocar de época, só troca de `payload.porEpoca[epoca]`.
  */
 function computarDashboardCompleto_(dados) {
   var base = computarBase_(dados);
@@ -568,13 +587,6 @@ function computarDashboardCompleto_(dados) {
   return {
     epocasDisponiveis: ['Todas'].concat(epocas),
     porEpoca: porEpoca,
-    classificacao: base.classificacao,
-    performanceIndividual: base.performanceIndividual,
-    multasPorJogador: base.multasPorJogador,
-    multasPorTipo: base.multasPorTipo,
-    performanceDesporto: base.performanceDesporto,
-    performanceDesportoIndividual: base.performanceDesportoIndividual,
-    correlacao: base.correlacao,
     historico: historicoBoletins_(base),
     config: base.config,
   };

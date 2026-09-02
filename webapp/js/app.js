@@ -134,12 +134,17 @@
     definirEstado(null, false);
     mostrarSeccoes();
     preencherEpocas(dados.epocasDisponiveis);
-    renderGlobais(dados);
     renderEpoca(epocaSelect.value);
   }
 
-  /** Único pedido ao servidor: traz tudo (todas as épocas, histórico e config). */
-  function carregarTudo() {
+  /** Único pedido ao servidor: traz tudo (todas as épocas, histórico e config).
+   * `avisarSeFalhar`: se true, uma falha de rede (mesmo já havendo cópia em
+   * cache) mostra um aviso visível em vez de ficar só na consola — usado depois
+   * de gravar algo (registar/editar/etc.), para nunca dar a entender que ficou
+   * tudo atualizado quando a atualização pode não ter chegado a acontecer. No
+   * arranque normal (sem escrita nenhuma), uma falha assim mantém-se silenciosa
+   * e mostra os dados guardados, sem alarmar por causa de uma rede instável. */
+  function carregarTudo(avisarSeFalhar) {
     var emCache = lerCacheDashboard_();
     if (emCache) {
       aplicarPayload_(emCache);
@@ -156,12 +161,19 @@
       .catch(function (err) {
         if (emCache) {
           console.error('Não foi possível atualizar dados frescos — a manter a última cópia guardada.', err);
+          if (avisarSeFalhar) {
+            definirEstado('⚠️ A gravação foi feita, mas não foi possível confirmar que os dados no ecrã já estão atualizados (' + err.message + '). Recarrega a página para confirmar.', true);
+          }
           return;
         }
         definirEstado('Não foi possível carregar os dados: ' + err.message, true);
         rejeitarConfig(err);
       });
   }
+
+  /** Chamado depois de qualquer escrita (registar/editar/marcar pago/etc.) —
+   * ver nota em `carregarTudo` sobre `avisarSeFalhar`. */
+  function refresh() { return carregarTudo(true); }
 
   /** Mantém a época escolhida se ela continuar a existir depois de um refresh. */
   function preencherEpocas(epocas) {
@@ -175,21 +187,20 @@
     epocaSelect.value = epocas.indexOf(anterior) >= 0 ? anterior : 'Todas';
   }
 
-  /** Secções que não dependem da época — renderizadas uma vez por carregamento. */
-  function renderGlobais(dados) {
-    renderClassificacao(dados.classificacao);
-    renderIndividual(dados.performanceIndividual);
-    renderMultas(dados.multasPorTipo, dados.multasPorJogador);
-    renderDesporto(dados.performanceDesporto, dados.performanceDesportoIndividual);
-    renderCorrelacao(dados.correlacao);
-  }
-
-  /** Secções filtradas pela época — puro trabalho em memória, sem rede. */
+  /** TUDO no dashboard segue o filtro de época (exceto Banca Atual/Total
+   * Levantado nos KPIs, que ficam sempre globais — tal como no Excel original).
+   * Puro trabalho em memória, sem rede: as fatias de todas as épocas já vêm
+   * calculadas em payload.porEpoca. */
   function renderEpoca(epoca) {
     if (!payload) return;
     var fatia = payload.porEpoca[epoca] || payload.porEpoca['Todas'];
     renderKpis(fatia.kpis);
     renderBanca(fatia.evolucaoBanca);
+    renderClassificacao(fatia.classificacao);
+    renderIndividual(fatia.performanceIndividual);
+    renderMultas(fatia.multasPorTipo, fatia.multasPorJogador);
+    renderDesporto(fatia.performanceDesporto, fatia.performanceDesportoIndividual);
+    renderCorrelacao(fatia.correlacao);
     renderHistorico(payload.historico, epoca);
   }
 
@@ -287,7 +298,7 @@
       'Maior Sequência de Derrotas': '🥶', 'Maior Assiduidade': '🏅', 'Pior Assiduidade': '🚩',
       'Maior Contribuição em Multas': '🔴',
     };
-    lista.filter(function (item) { return item.categoria !== 'Maior Indisciplina'; }).forEach(function (item) {
+    lista.forEach(function (item) {
       var div = document.createElement('div');
       div.className = 'classificacao-card';
       var valorFmt = item.valor === null ? '—'
@@ -314,8 +325,6 @@
     });
   }
 
-  var RENOMEAR_TIPO_MULTA_ = { 'Falta de Pick': 'Falta de Prognóstico' };
-
   function renderMultas(porTipo, porJogador) {
     var ctx = document.getElementById('chart-multas-tipo').getContext('2d');
     var textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim();
@@ -323,7 +332,7 @@
     chartMultasTipo = new Chart(ctx, {
       type: 'pie',
       data: {
-        labels: porTipo.map(function (t) { return RENOMEAR_TIPO_MULTA_[t.tipo] || t.tipo; }),
+        labels: porTipo.map(function (t) { return t.tipo; }),
         datasets: [{
           data: porTipo.map(function (t) { return t.valor; }),
           backgroundColor: porTipo.map(function (_, i) { return corSerie(i); }),
@@ -345,9 +354,9 @@
     tbody.innerHTML = '';
     porJogador.forEach(function (m) {
       var tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + esc(m.jogador) + '</td><td>' + m.nAtrasos + '</td><td>' + fmtEuro(m.multaAtraso) + '</td>'
+      tr.innerHTML = '<td>' + esc(m.jogador) + '</td><td>' + fmtEuro(m.pendentes) + '</td><td>' + m.nAtrasos + '</td><td>' + fmtEuro(m.multaAtraso) + '</td>'
         + '<td>' + m.nErros + '</td><td>' + fmtEuro(m.multaErro) + '</td><td>' + m.nFaltas + '</td>'
-        + '<td>' + fmtEuro(m.multaFalta) + '</td><td>' + fmtEuro(m.totalMultas) + '</td><td>' + fmtEuro(m.pendentes) + '</td>';
+        + '<td>' + fmtEuro(m.multaFalta) + '</td><td>' + fmtEuro(m.totalMultas) + '</td>';
       tbody.appendChild(tr);
     });
   }
@@ -620,7 +629,7 @@
   // depois de um registo com sucesso.
   window.BetTrackerApp = {
     configPronta: configPronta,
-    refresh: carregarTudo,
+    refresh: refresh,
     aoAtualizarConfig: aoAtualizarConfig,
   };
 })();

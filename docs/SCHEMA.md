@@ -145,29 +145,34 @@ Confirmada por inspeção direta das fórmulas do `.xlsx` (não assumida):
 questão** (`configParaData_`), não a versão atual — é assim que uma alteração de stake ou de
 multas feita hoje só afeta o que for registado a partir de agora.
 
-**Dashboard `PERFORMANCE`** (tudo calculado a pedido, com filtro opcional de `epoca`):
+**Dashboard `PERFORMANCE`** (tudo calculado a pedido, filtrado por `epoca` — exceto os dois KPIs
+marcados "Global" abaixo, tal como no Excel original):
 - **Banca Atual (Global)**: sempre sem filtro de época = `banca_inicial + Σ lucro(boletins
   concluídos) + Σ multas_faltas - Σ levantamentos`.
-- **KPIs filtráveis por época**: Lucro Total, Boletins Concluídos, Taxa de Sucesso, Odd Média,
-  Multas Totais/Pendentes, Multas Falta Prognóstico, Nº Faltas Registadas.
+- **Total Levantado (Global)**: soma de todos os levantamentos, sem filtro de época.
+- **Restantes KPIs, filtrados por época**: Lucro Total, Boletins Concluídos, Taxa de Sucesso, Odd
+  Média, Multas Totais/Pendentes, Multas Falta Prognóstico, Nº Faltas Registadas.
 - **Evolução da Banca**: percorre os boletins concluídos por ordem cronológica (globalmente,
   intercalando eventos de multas/levantamentos por data) acumulando a banca; os pontos do gráfico
   são depois filtrados para a época selecionada (tal como no Excel, a série é sempre a banca
   global mas só se mostram os pontos da época escolhida).
 - **Sequências (Seq. Atual / Máx. Vitórias / Máx. Derrotas) por jogador**: acumuladas boletim a
-  boletim, na mesma passagem cronológica.
+  boletim, dentro dos boletins já filtrados pela época.
 - **Performance Individual**: total apostas/acertos, taxa, odd mediana (todas/acerto/erro), maior
-  odd acertada, sequências — por jogador.
-- **Classificação**: 7 categorias mostradas na app (Maior Taxa de Acerto, Maior Odd Acertada, Maior
-  Sequência de Vitórias, Maior Sequência de Derrotas, Maior Assiduidade, Pior Assiduidade, Maior
-  Contribuição em Multas) — derivadas dos rollups acima. O backend (`Calculo.gs`) ainda calcula uma
-  8ª categoria, "Maior Indisciplina", mas o frontend filtra-a antes de renderizar (não fazia sentido
-  para o grupo); pode ser removida do `Calculo.gs` num próximo redeploy.
+  odd acertada, sequências — por jogador, filtrado por época.
+- **Classificação**: 7 categorias (Maior Taxa de Acerto, Maior Odd Acertada, Maior Sequência de
+  Vitórias, Maior Sequência de Derrotas, Maior Assiduidade, Pior Assiduidade, Maior Contribuição em
+  Multas) — derivadas dos rollups acima, filtrado por época.
 - **Multas por Jogador** / **Multas por Tipo** (Atraso / Erro Prognóstico / Falta de Prognóstico,
-  para o gráfico de pizza — o backend ainda devolve o tipo como `"Falta de Pick"`, renomeado no
-  frontend).
-- **Performance por Desporto** (global e matriz jogador × desporto).
-- **Correlação de Acertos entre Jogadores**: matriz N×N sobre a flag acerto/erro por boletim.
+  para o gráfico de pizza), filtrado por época.
+- **Performance por Desporto** (global e matriz jogador × desporto), filtrado por época.
+- **Correlação de Acertos entre Jogadores**: matriz N×N sobre a flag acerto/erro por boletim,
+  filtrado por época.
+
+Todos os rollups por jogador acima são recalculados por época dentro de `rollupsPorJogador_`
+(`Calculo.gs`), chamada uma vez por época (incluindo "Todas") a partir de `fatiaEpoca_` — não é
+uma passagem cara: o trabalho pesado (`calcularResultadoBoletim_`/`calcularMultasPorPerna_`) já foi
+feito uma única vez, sobre todos os boletins, em `computarBase_`.
 
 Toda esta lógica cabe numa única função `computarDashboard(epoca)` em Apps Script que percorre os
 boletins uma vez (agrupando `Apostas` por `id_boletim`, ordenando por data) e vai acumulando estado
@@ -184,11 +189,11 @@ Um único projeto Apps Script ligado à Sheet, publicado como Web App (`doGet`/`
 
 - `GET ?action=dashboard` → **payload completo, num só pedido**:
   - `epocasDisponiveis` — derivadas das datas reais dos dados (ver abaixo);
-  - `porEpoca` — mapa `{ "Todas": {kpis, evolucaoBanca}, "25/26": {...}, ... }` com a fatia de
-    **todas** as épocas já calculada;
-  - secções globais (não dependem da época): `classificacao`, `performanceIndividual`,
-    `multasPorJogador`, `multasPorTipo`, `performanceDesporto`, `performanceDesportoIndividual`,
-    `correlacao`;
+  - `porEpoca` — mapa `{ "Todas": {kpis, evolucaoBanca, classificacao, performanceIndividual,
+    multasPorJogador, multasPorTipo, performanceDesporto, performanceDesportoIndividual,
+    correlacao}, "25/26": {...}, ... }` com a fatia de **todas** as épocas já calculada. Só
+    `kpis.bancaAtual` e `kpis.totalLevantado` ficam sempre globais (tal como no Excel original) —
+    tudo o resto dentro de cada fatia está filtrado para essa época;
   - `historico` — todos os boletins **com dados** (incluindo os **pendentes**, que não entram em
     cálculo nenhum), do mais recente para o mais antigo, cada um com a sua `epoca` e as suas pernas.
     Ignora as linhas placeholder sem data e sem pernas preenchidas que vieram da migração do Excel

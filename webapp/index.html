@@ -48,13 +48,11 @@
 
     <section id="secao-classificacao" hidden>
       <h2>⭐ Classificação</h2>
-      <p class="secao-nota">Destaques de sempre — não muda com o filtro de época acima.</p>
       <div class="classificacao-grid" id="classificacao-grid"></div>
     </section>
 
     <section id="secao-individual" hidden>
       <h2>👥 Performance Individual</h2>
-      <p class="secao-nota">Todas as épocas.</p>
       <div class="table-scroll">
         <table id="tabela-individual">
           <thead><tr>
@@ -69,7 +67,6 @@
 
     <section id="secao-multas" hidden>
       <h2>🧾 Multas</h2>
-      <p class="secao-nota">Todas as épocas.</p>
       <div class="two-col">
         <div class="chart-card">
           <canvas id="chart-multas-tipo" role="img" aria-label="Gráfico de pizza das multas por tipo"></canvas>
@@ -78,8 +75,8 @@
           <table id="tabela-multas-jogador">
             <caption>🧾 Multas por Jogador</caption>
             <thead><tr>
-              <th>Jogador</th><th>Nº Atrasos</th><th>Multa Atraso</th><th>Nº Erros</th>
-              <th>Multa Erro</th><th>Nº Faltas</th><th>Multa Falta</th><th>Total</th><th>Pendentes</th>
+              <th>Jogador</th><th>Pendentes</th><th>Nº Atrasos</th><th>Multa Atraso</th><th>Nº Erros</th>
+              <th>Multa Erro</th><th>Nº Faltas</th><th>Multa Falta</th><th>Total</th>
             </tr></thead>
             <tbody></tbody>
           </table>
@@ -89,7 +86,6 @@
 
     <section id="secao-desporto" hidden>
       <h2>🏀 Performance por Desporto</h2>
-      <p class="secao-nota">Todas as épocas.</p>
       <div class="two-col">
         <div class="table-scroll">
           <table id="tabela-desporto-global">
@@ -110,7 +106,7 @@
     <section id="secao-correlacao" hidden>
       <h2>🔗 Correlação de Acertos entre Jogadores</h2>
       <p class="secao-nota">Com que frequência dois jogadores acertam/erram no mesmo boletim. Perto de 1 = tendem
-        a acertar juntos; perto de −1 = quando um acerta o outro costuma errar. Todas as épocas.</p>
+        a acertar juntos; perto de −1 = quando um acerta o outro costuma errar.</p>
       <div class="table-scroll">
         <table id="tabela-correlacao">
           <thead><tr id="correlacao-head"><th>Jogador</th></tr></thead>
